@@ -34,6 +34,15 @@
                                        &key (collision-group :default-filter)
                                          (collision-mask :all-filter)
                                          (pose (cl-transforms:make-identity-pose)))
+  (roslisp:ros-warn (btr) "init-instance-simple. Params:
+ ~a
+~a
+~a
+~a" semantic-map-object collision-group collision-mask pose)
+  (with-slots (pose-reference-body semantic-map) semantic-map-object
+    
+    (roslisp:ros-warn (btr) "parts: ~a " (sem-map-utils:semantic-map-parts  semantic-map :recursive t)))
+  
   (with-slots (pose-reference-body semantic-map) semantic-map-object
     (let ((bodies (loop for part in (sem-map-utils:semantic-map-parts
                                      semantic-map :recursive t)
@@ -41,8 +50,10 @@
                                     part
                                     :pose pose
                                     :collision-group collision-group
-                                    :collision-mask collision-mask)
-                        when body collect body)))
+                                    :collision-mask collision-mask
+                                    :mesh t) ;TODO
+                        when body collect body)
+                  (roslisp:ros-warn (btr) "done loading parts")))
       (initialize-rigid-bodies semantic-map-object bodies)
       (setf pose-reference-body (car bodies)))))
 
@@ -52,22 +63,68 @@
      (call-next-method) 'simple-semantic-map-object
      :semantic-map (sem-map-utils:copy-semantic-map-object semantic-map))))
 
-(defgeneric semantic-map-part-rigid-body (part &key pose collision-group collision-mask)
+(defgeneric semantic-map-part-rigid-body (part &key pose collision-group collision-mask mesh)
   (:documentation "Returns a rigid body for the semantic map part `part'.")
-  (:method ((part sem-map-utils:semantic-map-geom) &key pose collision-group collision-mask)
-    (make-instance 'rigid-body
-      :name (intern (sem-map-utils:name part))
-      :group collision-group
-      :mask collision-mask
-      :pose (cl-transforms:transform-pose
-             (cl-transforms:pose->transform pose)
-             (sem-map-utils:pose part))
-      :collision-shape (make-instance 'box-shape
-                         :half-extents (cl-transforms:v*
-                                        (sem-map-utils:dimensions part)
-                                        0.5))))
-  (:method ((part t) &key pose collision-group collision-mask)
+;  (:method ((part sem-map-utils:semantic-map-geom) &key pose collision-group collision-mask (mesh nil))
+;    (roslisp:ros-warn (btr) "this is called")
+;    (make-instance 'rigid-body
+;      :name (intern (sem-map-utils:name part))
+;      :group collision-group
+;      :mask collision-mask
+;      :pose (cl-transforms:transform-pose
+;             (cl-transforms:pose->transform pose)
+;             (sem-map-utils:pose part))
+;      :collision-shape (make-instance 'box-shape
+;                         :half-extents (cl-transforms:v*
+;                                        (sem-map-utils:dimensions part)
+;                                        0.5))))
+  
+  (:method ((part t) &key pose collision-group collision-mask (mesh nil))
     (declare (ignore pose collision-group collision-mask))
     (warn 'simple-warning
           :format-control "Unable to generate a rigid body for semantic map part of type `~a'."
-          :format-arguments (list (type-of part)))))
+          :format-arguments (list (type-of part))))
+;;TODO
+  (:method ((part sem-map-utils:semantic-map-part) &key pose collision-group collision-mask (mesh t))
+    (roslisp:ros-warn (btr) "spawning rigid body based on mesh for semantic map part: ~a" part)
+    (if (eql part nil)
+        (roslisp:ros-warn (btr) "Part is NIL")
+        ;;NOTE Step1: load mesh
+        (if (eql pose '1)
+            (roslisp:ros-warn (btr) "No Pose Value")
+            (progn    
+              (roslisp:ros-warn (btr) "Pose: ~a"   (sem-map-utils::get-mesh-pose (sem-map-utils:owl-name part)))
+              (let* ((mesh-name (sem-map-utils:owl-name part))
+                     (mesh-model nil))
+                (setf mesh-model (physics-utils:scale-3d-model
+                                  (let ((uri
+                                          (physics-utils:parse-uri
+                                           (remove #\'
+                                                   (symbol-name
+                                                    (sem-map-utils::get-mesh-path mesh-name)))))
+                                        (model nil))
+                                    (roslisp:ros-warn (btr) "uri: ~a" uri)
+                                    (physics-utils:load-3d-model uri :flip-winding-order t
+                                                                     :compound model)) 
+                                  1.0)) ;scaling factor is currently 1.0 anyway in every model
+      
+                (roslisp:ros-warn (btr) "part name: ~a" (intern (sem-map-utils:name part)))
+      
+            
+            ;;NOTE Step2: spawn model or create instance of it
+                (roslisp:ros-warn (btr) "Rigid Body" )
+                (make-instance 'rigid-body
+                  :name (intern (sem-map-utils:name part))
+                  :mass 0.5
+                  :group collision-group
+                  :mask collision-mask
+                  :pose  (cl-transforms:transform-pose
+                          (cl-transforms:pose->transform pose)
+                          (sem-map-utils:pose part))
+                  :collision-shape (make-instance 'convex-hull-mesh-shape
+                                     :points (physics-utils:3d-model-vertices mesh-model)
+                                     :faces (physics-utils:3d-model-faces mesh-model)
+                                     :color '(0.5 0.5 0.5 1.0) ;some random color
+                                     :disable-face-culling t)))
+              (roslisp:ros-warn (btr) "Done!"))))))
+

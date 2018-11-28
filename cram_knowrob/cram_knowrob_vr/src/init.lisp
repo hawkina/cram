@@ -76,7 +76,7 @@
   (ros-info (kvr) "spawning semantic-map kitchen...")
 ;           (assert (btr:object ?world :urdf :kitchen ((0 0 0) (0 0 0 1))
 
-(sem-map:get-semantic-map)
+;(sem-map:get-semantic-map)
 ;(cram-occasions-events:clear-belief)
 
   (let ((kitchen-urdf 
@@ -148,3 +148,22 @@ iri_xml_namespace(Sub, PrefixName, Name)."
   (json-prolog:prolog-simple-1
    "object_mesh_path('http://knowrob.org/kb/unreal_log.owl#BaerenMarkeFrischeAlpenmilch18_4OVo', Pose)."
 ))
+
+(defun prolog-testing4()
+  (cut:var-value
+   (intern "?OwlName")
+   (cut:lazy-car 
+    (json-prolog:prolog-simple
+     "owl_has(OwlName, rdf:type, knowrob:'WasaDelicateCrisp')."))))
+
+(defun prolog-testing5()
+  (cut:lazy-car 
+   (json-prolog:prolog
+    `(and ("owl_has" "OwlName" "rdf:type" "knowrob:'IslandArea'"))
+    :package :cram-knowrob-vr)))
+
+(defun prolog-testing6()
+  (json-prolog:prolog-simple-1 "map_name(MapName),
+map_root_objects(MapName, Objects),
+member(Obj, Objects),
+current_object_pose(Obj, MeshPath)."))

@@ -167,9 +167,11 @@ The name in the list is a keyword that is created by lispifying the filename."
                        mass)
   (add-object world :mesh name pose :mass mass :mesh :mug))
 
+
 (defmethod add-object ((world bt-world) (type (eql :mesh)) name pose
                        &key mass mesh (color '(0.5 0.5 0.5 1.0)) types (scale 1.0)
                          disable-face-culling)
+  (roslisp:ros-warn (btr) "Add-object via mesh")
   (let ((mesh-model (physics-utils:scale-3d-model
                      (etypecase mesh
                        (symbol (let ((uri (physics-utils:parse-uri

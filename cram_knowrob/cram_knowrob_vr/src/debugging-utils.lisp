@@ -94,3 +94,18 @@ NAME-OF-OBJECT: The name of the object instance, for which it should be checked 
   (prolog:prolog `(and (btr:bullet-world ?world)
                               (cram-robot-interfaces:robot ?robot)
                               (btr:visible ?world ?robot ,name-of-object))))
+
+
+;;; several functions used to for testing components of code
+(defun test-loading-mesh (mesh-name)
+  (let ((mesh-model (physics-utils:scale-3d-model
+                        (let ((uri
+                                (physics-utils:parse-uri
+                                 (remove #\'
+                                         (symbol-name
+                                          (sem-map-utils::get-mesh-path mesh-name)))))
+                              (model nil))
+                          (physics-utils:load-3d-model uri :flip-winding-order t
+                                                       :compound model)) 
+                        1.0)))
+    mesh-model))

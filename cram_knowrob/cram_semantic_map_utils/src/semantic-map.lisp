@@ -61,6 +61,7 @@
 
 (defgeneric copy-semantic-map-object (obj)
   (:method ((map semantic-map))
+    (roslisp:ros-warn (semantic-map-utils) "copy-map-object1" )
     (make-instance 'semantic-map
       :parts (alexandria:alist-hash-table
               (mapcar (lambda (elem)
@@ -69,8 +70,10 @@
                       (alexandria:hash-table-alist (slot-value map 'parts)))
               :test (hash-table-test (slot-value map 'parts)))))
   (:method ((null null))
+    (roslisp:ros-warn (semantic-map-utils) "copy-map-object2" )
     nil)
   (:method ((part semantic-map-part))
+    (roslisp:ros-warn (semantic-map-utils) "copy-map-object3" )
     (let* ((slots '(type name owl-name urdf-name aliases))
            (initargs '(:type :name :owl-name :urdf-link-name :aliases))
            (copy (apply #'make-instance 'semantic-map-part
@@ -119,13 +122,16 @@
     (declare (ignore recursive))
     nil)  
   (:method ((map semantic-map) &key recursive)
+    (roslisp:ros-warn (sem-map-utils) "semantic map MAP in parts: ~a " map)
     (let ((direct-children (loop for part being the hash-values of (slot-value map 'parts)
                                  collecting part)))
       (append direct-children
               (when recursive
                 (mapcan (lambda (child)
                           (semantic-map-parts child :recursive recursive))
-                        direct-children)))))
+                        direct-children)))
+      ;(roslisp:ros-warn (semantic-map-utils) "Children: ~a" direct-children)
+      ))
 
   (:method ((map semantic-map-part) &key recursive)
     (let ((direct-children (sub-parts map)))
@@ -133,7 +139,8 @@
               (when recursive
                 (mapcan (lambda (child)
                           (semantic-map-parts child :recursive recursive))
-                        direct-children))))))
+                        direct-children)))
+      (roslisp:ros-warn (semantic-map-utils) "Children2: ~a" direct-children))))
 
 (defgeneric semantic-map-part-names (map)
   (:method ((null null))
@@ -228,6 +235,7 @@
                                    aliases)
                   :parent parent)))))))
 
+;; TODO
 (defgeneric make-semantic-map-part (type name owlname parent)
   (:method ((type t) name owlname parent)
     ;; TODO(moesenle): The default handling feels pretty wrong
@@ -235,6 +243,10 @@
     ;; somehow inside an owl type initializer.
     (or (run-owl-type-initializer type name owlname parent)
         (with-vars-bound (?pose ?dim ?labels ?meshPath)
+            (roslisp:ros-warn (semantic-map-utils) "Name: ~a" name)
+          (roslisp:ros-warn (semantic-map-utils) "owlname: ~a" owlname)
+          (roslisp:ros-warn (semantic-map-utils) "type: ~a" type)
+          (roslisp:ros-warn (semantic-map-utils) "parent: ~a" parent)
             ;(roslisp:ros-warn (semantic-map-utils) "make-semantic-map-part-mesh:")
             (lazy-car
              (json-prolog:prolog
@@ -246,32 +258,24 @@
                 ("object_mesh_path" ,owlname ?meshPath)
                 ("findall" ?l ("map_object_label" ,owlname ?l) ?labels))
               :package :sem-map-utils))
+          (roslisp:ros-warn (semantic-map-utils) "Pose: ~a " ?pose)
           (let ((aliases (unless (is-var ?labels)
                            ?labels)))
-            (roslisp:ros-warn (semantic-map-utils) "labels")
             (if (or (is-var ?pose) (is-var ?dim))
-                (make-instance 'semantic-map-part
-                               :type type :name name :owl-name owlname
-                               :aliases (mapcar (lambda (label)
-                                                  (remove #\' (symbol-name label)))
-                                                aliases)
-                  :parent parent)
-                (btr:add-object ;TODO fix circular dependency
-                btr:*current-bullet-world*
-                 :mesh
-                 owlname
-;;                 ;;pose:
-                 (destructuring-bind (map name pose quaternion)
-                     ?pose 
-                   (destructuring-bind (x y z) pose
-                     (destructuring-bind (w q1 q2 q3) quaternion ;w q1 q2 q3
-                       (list (list x y z)(list w q1 q2 q3)))))
-                 :mass 0.2 ;TODO ask if this is important? Can I read this out from map?
-                 :mesh (cram-physics-utils::load-3d-model
-                        (cram-physics-utils::parse-uri
-                         (remove #\'  (symbol-name ?meshPath))))
-                 )
-               ))))))
+                (if (eql ?meshPath nil)
+                    (roslisp:ros-warn (semantic-map-utils) "no mesh path ~a" ?meshPath))
+                (if (eql ?pose 1)
+                    (roslisp:ros-warn (semantic-map-utils) "?pose was 1 ~a" ?pose)
+                    (make-instance 'semantic-map-part
+                      :type type
+                      :name name
+                      :owl-name owlname
+                      :urdf-name nil
+                      :aliases (mapcar (lambda (label)
+                                         (remove #\' (symbol-name label)))
+                                       aliases)
+                      :parent parent)               
+                    )))))))
 
 (defgeneric update-pose (obj new-pose &key relative recursive)
   (:documentation "Updates the pose of `obj' using `new-pose'. When
@@ -382,6 +386,7 @@
      ,@body))
 
 (defun init-semantic-map-cache (&optional map-name)
+  (roslisp:ros-warn (semantic-map-utils) "!!map-name ~a" map-name)
   (unless (and map-name
                (string= map-name *cached-semantic-map-name*))
     (if (json-prolog:check-connection)
@@ -391,7 +396,7 @@
                  (lazy-car
                   (json-prolog:prolog
                    '("map_name" ?name)
-                   :package :sem-map-utils)))))
+                   :package :sem-map-utils)))))  
           (when (is-var uploaded-map-name)
             (roslisp:ros-warn (sem-map-cache)
                               "MAP-NAME predicate is undefined for uploaded map.
@@ -404,34 +409,39 @@ Cannot update semantic map.")
                               "MAP-NAME ~a is different from uploaded map ~a. Ignoring."
                               map-name uploaded-map-name))
           (unless (string= uploaded-map-name *cached-semantic-map-name*)
+             (roslisp:ros-warn (sem-map-cache)
+                              "MAP-NAME cache: ~a | ~a " uploaded-map-name  *cached-semantic-map-name*)
             (setf *cached-semantic-map*
-                  (make-instance
+                   (make-instance
                       'semantic-map
-                    :parts (alexandria:alist-hash-table
-                            (mapcar
-                             (lambda (elem)
-                               (cons (name elem) elem))
-                             (force-ll
-                              (lazy-mapcan
-                               (lambda (bdgs)
-                                 (with-vars-bound (?type ?n ?o ?prefixtype ?prefixname) bdgs
-                                   (unless (or (is-var ?type) (is-var ?o))
-                                     (list (make-semantic-map-part
-                                            (remove #\' (symbol-name ?type))
-                                            (remove #\' (symbol-name ?n))
-                                            (remove #\' (symbol-name ?o))
-                                            nil)))))
-                               (json-prolog:prolog
-                                `(and ("map_root_objects" ,uploaded-map-name ?objs)
-                                      ("member" ?o ?objs)
-                                      ("rdf_has" ?o "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" ?tp)
-                                     ; ("owl_subclass_of" ?tp "http://knowrob.org/kb/knowrob.owl#SpatialThing")
-                                      ("iri_xml_namespace" ?tp ?prefixtype ?type) ;"rdf_atom_no_ns" ?tp ?type 
-                                      ("iri_xml_namespace" ?o ?prefixname ?n)) ; "rdf_atom_no_ns" ?o ?n
-                                :package :sem-map-utils))))
-                            :test 'equal))
-                  *cached-semantic-map-name* uploaded-map-name)
-            (roslisp:ros-warn (sem-map-cache) "Done quering!" )
+                     :parts (alexandria:alist-hash-table
+                             (mapcar
+                              (lambda (elem)
+                                (cons (name elem) elem))
+                              (force-ll
+                               (lazy-mapcan
+                                (lambda (bdgs)
+                                  (with-vars-bound (?type ?n ?o ?prefixtype ?prefixname) bdgs
+                                    (unless (or (is-var ?type) (is-var ?o))
+                                      (list (make-semantic-map-part
+                                             (remove #\' (symbol-name ?type))
+                                             (remove #\' (symbol-name ?n))
+                                             (remove #\' (symbol-name ?o))
+                                             nil)))))
+                                (json-prolog:prolog
+                                 `(and ("map_root_objects" ,uploaded-map-name ?objs)
+                                       ("member" ?o ?objs)
+                                       ("rdf_has" ?o "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" ?tp)
+                                        ; ("owl_subclass_of" ?tp "http://knowrob.org/kb/knowrob.owl#SpatialThing")
+                                       ("iri_xml_namespace" ?tp ?prefixtype ?type) ;"rdf_atom_no_ns" ?tp ?type 
+                                       ("iri_xml_namespace" ?o ?prefixname ?n)) ; "rdf_atom_no_ns" ?o ?n
+                                 :package :sem-map-utils))))
+                             :test 'equal))
+                   *cached-semantic-map-name* uploaded-map-name)
+            
+            (roslisp:ros-warn (sem-map-cache)
+                              "MAP-NAME cache2: ~a | ~a " uploaded-map-name  *cached-semantic-map-name*)
+            
             (roslisp:ros-info (sem-map-cache) "Updated semantic map cache.")))
         (roslisp:ros-warn (sem-map-cache)
                           "No connection to json-prolog server. Cannot update semantic map."))))
@@ -600,3 +610,28 @@ of map. When `recursive' is T, recursively traverses all sub-parts, i.e. returns
                          (remove #\' (symbol-name label)))
                        (unless (is-var ?labels) ?labels))
       :parent parent)))
+
+;; TODO work in progress
+(defun get-mesh-path (owlname) 
+;  "Returns the path of the mesh given the owlname of the mesh"
+  (roslisp:ros-warn (sem-map-utils) "get-mesh-path ~a" owlname)
+  (cut:var-value
+   (intern "?MeshPath")
+   (cut:lazy-car
+    (json-prolog:prolog-simple
+     (concatenate 'string
+                  "object_mesh_path('"
+                  owlname
+                  "', MeshPath).")))))
+
+(defun get-mesh-pose (owlname) 
+;  "Returns the path of the mesh given the owlname of the mesh"
+  (roslisp:ros-warn (sem-map-utils) "get-mesh-pose ~a" owlname)
+  (cut:var-value
+   (intern "?MeshPath")
+   (cut:lazy-car
+    (json-prolog:prolog-simple
+     (concatenate 'string
+                  "current_object_pose('"
+                  owlname
+                  "', MeshPose).")))))

@@ -60,6 +60,7 @@
 (defgeneric rigid-bodies (obj)
   (:documentation "Return the list of rigid bodies that belong to the object `obj'")
   (:method ((obj object))
+    (roslisp:ros-warn (btr) "rigid-bodies list ~a " obj)
     (loop for name being the hash-keys in (slot-value obj 'rigid-bodies)
           using (hash-value body)
           collecting (or body (rigid-body obj name)))))
@@ -73,6 +74,7 @@
 (defgeneric rigid-body (obj name)
   (:documentation "Returns the rigid body named `name' or NIL if the body doesn't exist")
   (:method ((obj object) name)
+    (roslisp:ros-warn (btr) "make rigid body ~a ~a" obj name)
     (with-slots (world rigid-bodies) obj
       (multiple-value-bind (value valid)
           (gethash name rigid-bodies)
@@ -102,6 +104,7 @@
 
 (defgeneric initialize-rigid-bodies (object rigid-bodies &key add)
   (:method ((object object) rigid-bodies &key (add t))
+    (roslisp:ros-warn (btr) "initialize rigid bodies ~a ~a " object rigid-bodies)
     (with-slots (world) object
       (declare (type list rigid-bodies))
       (assert (eql (hash-table-count (slot-value object 'rigid-bodies)) 0))
@@ -116,7 +119,8 @@
               body)))))
 
 (defun make-object (world name &optional
-                    bodies (add-to-world t))
+                                 bodies (add-to-world t))
+  (roslisp:ros-warn (btr) "make-object ~a" name)
   (make-instance 'object
                  :name name
                  :world world
@@ -126,6 +130,7 @@
 (defmethod initialize-instance :after ((object object)
                                        &key rigid-bodies pose-reference-body
                                          (add t))
+  (roslisp:ros-warn (btr) "initialize-instance of object: ~a" object)
   (when rigid-bodies
     (initialize-rigid-bodies object rigid-bodies :add add)
     (unless pose-reference-body
@@ -169,6 +174,7 @@
 
 (defmethod add-object ((world bt-reasoning-world) type name pose
                        &key disable-collisions-with)
+  (roslisp:ros-warn (btr) "add-object type: ~a ~a" type name)
   (prog1
       (call-next-method)
     (when disable-collisions-with

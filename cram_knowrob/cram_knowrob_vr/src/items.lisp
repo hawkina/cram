@@ -74,3 +74,4 @@ RETURNS: Lazy list containing the created axes-object."
                    (assert (btr:object ?world :mesh ,?name ((2 2 1) (0 0 0 1))
                             :mass 0.2 :color (0 1 1) :mesh ,?name)))))
 
+
