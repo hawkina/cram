@@ -54,7 +54,8 @@
                trajectory_msgs-msg
                move_base_msgs-msg
                giskard_msgs-msg
-               giskard_msgs-srv)
+               giskard_msgs-srv
+               cram-math)
   :components
   ((:module "src"
     :components
