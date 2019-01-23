@@ -581,6 +581,15 @@ of map. When `recursive' is T, recursively traverses all sub-parts, i.e. returns
                                    owlname
                                    "', MeshPath)."))))))))
     ;check if mesh-path is in the whitelist
-    (if (find mesh-path *mesh-path-whitelist* :test #'equalp)
-        mesh-path
-        nil)))
+    ;; TODO comment back in once it works again.
+        (if (find mesh-path *mesh-path-whitelist* :test #'equalp)
+            mesh-path
+     nil)))
+;;    mesh-path))
+
+  (defun upd-path (old-path)
+       (let* ((filename (subseq old-path (+ (position #\/ old-path :from-end T) 1)))
+              (filename (subseq filename 0 (position #\. filename :from-end T)))
+              (path-prefix (subseq old-path 0 (position #\/ old-path :from-end T)))
+              (extension (subseq old-path (+ (position #\. old-path :from-end T) 1))))
+         (format nil "~a/IAI~a/IAI~a.~a" path-prefix filename filename extension)))

@@ -15,10 +15,12 @@
   (start-ros-node "cram_knowrob_vr")
   (register-ros-package "knowrob_robcog")
   (u-load-episodes "/home/hasu/ros_workspace/episode_data/episodes/Own-Episodes/set-clean-table/rcg_eval2/Episodes/")
-  (owl-parse "/home/hasu/ros_workspace/episode_data/episodes/Own-Episodes/set-clean-table/rcg_eval2/SemanticMap.owl")
+  (owl-parse "/home/hasu/ros_workspace/episode_data/episodes/Own-Episodes/set-clean-table/rcg_eval2/SemanticMap_RotatedMissplaced90.owl")
+;  (owl-parse "/home/hasu/ros_workspace/episode_data/episodes/Own-Episodes/set-clean-table/rcg_eval2/SemanticMap.owl") ;;NOTE the "real" map
 ;  (owl-parse "/home/hasu/ros_workspace/episode_data/episodes/Own-Episodes/set-clean-table/rcg_eval2/iai-kitchen-knowledge.owl")
   (connect-to-db "Own-Episodes_set-clean-table")  
   (map-marker-init))
+
 
 
 ;; initializes the bullet world environment based on the bullet-world-tutorial
@@ -74,9 +76,25 @@
 
   (sem-map:get-semantic-map)
 
+  
+  ;; spawning semantic map kitchen
   (prolog:prolog
    `(and (btr:bullet-world ?world)
-         (assert (btr:object ?world :semantic-map :kitchen ((0 0 0) (0 0 0 1)))))))
+         (assert (btr:object ?world :semantic-map :semantic-map-kitchen ((0 -3 0) (0 0 0 1))))))
+
+  ;; spawning urdf kitchen
+  (prolog:prolog
+   `(and (btr:bullet-world ?world)
+         (assert (btr:object ?world :urdf :kitchen ((0 0 0) (0 0 0 1))
+                                          :collision-group :static-filter
+                                          :collision-mask (:default-filter :character-filter)
+                                          :compound t
+                                          :urdf ,(cl-urdf:parse-urdf (roslisp:get-param "kitchen_description"))))))
+
+
+
+
+  )
 
 ;;; NOTE: Might not be needed anymore since the items are initialized with
 ;;; the spawning of the semantic map automatically. 

@@ -4,7 +4,7 @@
 ;;; base, this offset can be added in order to prevent the robot from crashing
 ;;; into the bases of tables.
 ;;; in short: moves the robot away from the given pose to avoid collisions.
-(defparameter *human-feet-offset* 0.12 ) ;; was 0.3 for Andrei's Data
+(defparameter *human-feet-offset* 0.0 ) ;; was 0.3 for Andrei's Data 0.12 for semantic map
 
 
 ;; example: (make-poses "?PoseCameraStart")
@@ -89,9 +89,13 @@ robot in the bullet world should place the object currently in hand."
     (setq table-pose-bullet
           (cl-tf:pose->transform
            (btr:pose
-            (btr:rigid-body
-             (btr:object btr:*current-bullet-world* :kitchen)
-             '|IslandArea_nhwy|))))
+            (if (btr:rigid-body
+                 (btr:object btr:*current-bullet-world* :kitchen)
+                 '|IslandArea_nhwy|)
+                ()
+                (btr:rigid-body
+                  (btr:object btr:*current-bullet-world* :kitchen)
+                  ':|KITCHEN.kitchen_island|)))))
     ; calculate place pose relative to bullet table
     (setq place-pose
           (cl-tf:transform*
