@@ -257,29 +257,18 @@ Returns: list of cl-tf:pose."
                               '(0 0.7 0)))))
 
 
-
-(defun spawn-arrows-to-test-objects (type)
-  (let* ((poses-list (umap-P-uobj-through-surface-from-list-ll type "Start"))
-        (obj-pose (convert-into-poses-list
-                   (list (slot-value (car poses-list) 'obj-pose))))
-        (base-pose (convert-into-poses-list
-                    (list (slot-value (car poses-list) 'base-pose)))))
-    
-    (spawn-btr-arrow (car obj-pose) "btr-arrow-object-pose" '(1 0 0))
-    (spawn-btr-arrow (car base-pose) "btr-arrow-base-pose" '(0 1 0))))
-
 (defun spawn-arrows-from-list (list)
   ;; eg for ?visibility and such. list of poses
   (dolist (pose list)
     (spawn-btr-arrow pose (arrow-prefix) '(0 0 1))))
 
-(defun spawn-visibility-arrows (pose-stamped-list &optional desig-color)
+(defun spawn-arrows (pose-stamped-list &optional (desig-color 'vis))
   "spawns arrows according to the ?visibility or ?reachability lists.
 `pose-stamped-list' is the given ?visibility or ?reachability list.
 `desig-color' can be set to 'vis or 'reach depending on which list it is.
 'vis arrows = dark green
 'reach arrows = dark blue"
-  (let ((poses-list (convert-into-poses-list (car pose-stamped-list)))
+  (let ((poses-list (convert-into-poses-list (cut:force-ll pose-stamped-list)))
         (color (cond ((eq desig-color 'vis)
                       '(1.0 0.6 0.0))
                      ((eq desig-color 'reach)
@@ -288,3 +277,21 @@ Returns: list of cl-tf:pose."
                       '(0 0.5 0.7)))))
     (dolist (pose poses-list)
       (spawn-btr-arrow pose (arrow-prefix) color))))
+
+(defun spawn-all-arrows (type &optional (obj-pose (cl-transforms:make-identity-pose)))
+  "type should be 'cup 'bowl or 'spoon"
+  ;; kill all possibly existing objects/arrows
+   (btr-utils:kill-all-objects)
+  ;; search base poses
+  (spawn-arrows
+   (base-poses-ll-for-searching (object-type-filter-prolog type)) 'vis)
+  ;; fetch base poses
+  (spawn-arrows
+   (base-poses-ll-for-fetching-based-on-object-pose
+    (object-type-filter-bullet type) obj-pose) 'reach)
+  ;; target poses on table
+  (spawn-arrows
+   (object-poses-ll-for-placing (object-type-filter-prolog type)) 'reach)
+  ;; deliver base poses
+  (spawn-arrows
+   (base-poses-ll-for-placing type)) 'del)
